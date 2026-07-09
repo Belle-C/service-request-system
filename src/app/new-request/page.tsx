@@ -1,31 +1,49 @@
-export default function NewRequestPage() {
+import { prisma } from "@/lib/prisma";
+import { sapRequestFormCode } from "@/lib/service-request";
+import NewRequestForm from "@/components/NewRequestForm";
+
+export const dynamic = "force-dynamic";
+
+export default async function NewRequestPage() {
+  let configs: { id: string; subcategory: string; isActive: boolean }[] = [];
+  let settings: { descriptionRequired: boolean; attachmentRequired: boolean } | null = null;
+  let isOffline = false;
+
+  try {
+    configs = await prisma.sapS4Config.findMany({
+      where: { formCode: sapRequestFormCode, isActive: true },
+      orderBy: { subcategory: "asc" },
+      select: {
+        id: true,
+        subcategory: true,
+        isActive: true,
+      },
+    });
+
+    settings = await prisma.sapS4GlobalSetting.findUnique({
+      where: { formCode: sapRequestFormCode },
+      select: {
+        descriptionRequired: true,
+        attachmentRequired: true,
+      },
+    });
+  } catch (err) {
+    console.error("Database connection failed in NewRequestPage:", err);
+    isOffline = true;
+  }
+
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
-      <section className="rounded-lg border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-[var(--primary)]">
-          Category Selection
-        </h1>
-        <p className="mt-2 text-[var(--muted)]">
-          Please choose your request type before proceeding with the form.
+      <section className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Create Request
         </p>
-        <label className="mt-6 block text-sm font-medium" htmlFor="category">
-          Category
-        </label>
-        <select
-          className="mt-2 w-full rounded-md border border-[var(--border)] bg-white px-3 py-2"
-          id="category"
-        >
-          <option>Find items</option>
-          <option>SAP S4 HANA Request</option>
-          <option>Digital Support Request</option>
-          <option>Application Enhancement Request</option>
-          <option>Offboarding Request</option>
-        </select>
-        <button className="mt-6 rounded-md bg-[var(--primary)] px-5 py-2 font-semibold text-white">
-          Next Step
-        </button>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
+          New Service Request
+        </h1>
       </section>
+
+      <NewRequestForm configs={configs} settings={settings} isOffline={isOffline} />
     </main>
   );
 }
-

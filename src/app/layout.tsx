@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppHeader } from "@/components/AppHeader";
+import { RoleProvider } from "@/components/RoleProviderWrapper";
 
 export const metadata: Metadata = {
   title: "Service Request System",
@@ -15,8 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AppHeader />
-        {children}
+        <RoleProvider>
+          <AppHeader />
+          {children}
+        </RoleProvider>
       </body>
     </html>
   );
