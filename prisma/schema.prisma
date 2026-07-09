@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  email           String            @unique
+  jobTitle        String?           @map("job_title")
+  department      String?
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  roles           UserRole[]
+  requests        Request[]
+  approvals       RequestApproval[]
+  approvalActions ApprovalAction[]
+  auditLogs       AuditLog[]        @relation("AuditActor")
+  uploads         Attachment[]
+
+  @@map("users")
+}
+
+model Role {
+  id       String     @id @default(uuid()) @db.Uuid
+  code     String     @unique @map("role_code")
+  name     String     @map("role_name")
+  userRole UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  role      Role     @relation(fields: [roleId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model Module {
+  id           String  @id @default(uuid()) @db.Uuid
+  code         String  @unique @map("module_code")
+  name         String  @map("module_name")
+  isActive     Boolean @default(true) @map("is_active")
+  displayOrder Int     @default(0) @map("display_order")
+  forms        Form[]
+
+  @@map("modules")
+}
+
+model Form {
+  id           String        @id @default(uuid()) @db.Uuid
+  moduleId     String        @map("module_id") @db.Uuid
+  code         String        @unique @map("form_code")
+  name         String        @map("form_name")
+  isActive     Boolean       @default(true) @map("is_active")
+  displayOrder Int           @default(0) @map("display_order")
+  module       Module        @relation(fields: [moduleId], references: [id])
+  requests     Request[]
+  configs      SapS4Config[]
+
+  @@map("forms")
+}
+
+model TicketSequence {
+  id         String   @id @default(uuid()) @db.Uuid
+  prefix     String   @unique
+  lastNumber Int      @default(0) @map("last_number")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("ticket_sequences")
+}
+
+model Request {
+  id                    String            @id @default(uuid()) @db.Uuid
+  ticketNo              String            @unique @map("ticket_no")
+  moduleCode            String            @map("module_code")
+  formCode              String            @map("form_code")
+  requesterId           String            @map("requester_id") @db.Uuid
+  status                String
+  subcategory           String?
+  description           String?
+  currentApprovalLevel  Int?              @map("current_approval_level")
+  approverRouteSnapshot Json?             @map("approver_route_snapshot")
+  submittedAt           DateTime?         @map("submitted_at")
+  approvedAt            DateTime?         @map("approved_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  form                  Form              @relation(fields: [formCode], references: [code])
+  requester             User              @relation(fields: [requesterId], references: [id])
+  approvals             RequestApproval[]
+  approvalActions       ApprovalAction[]
+  attachments           Attachment[]
+  auditLogs             AuditLog[]
+  emailOutbox           EmailOutbox[]
+  emailActionTokens     EmailActionToken[]
+
+  @@index([requesterId])
+  @@index([moduleCode, formCode])
+  @@index([status])
+  @@map("requests")
+}
+
+model RequestApproval {
+  id          String             @id @default(uuid()) @db.Uuid
+  requestId   String             @map("request_id") @db.Uuid
+  levelNo     Int                @map("level_no")
+  approverId  String             @map("approver_id") @db.Uuid
+  status      String
+  decision    String?
+  comments    String?
+  decisionAt  DateTime?          @map("decision_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  request     Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approver    User               @relation(fields: [approverId], references: [id])
+  actions     ApprovalAction[]
+  emailTokens EmailActionToken[]
+
+  @@index([requestId, status])
+  @@index([approverId, status])
+  @@map("request_approvals")
+}
+
+model ApprovalAction {
+  id         String           @id @default(uuid()) @db.Uuid
+  requestId  String           @map("request_id") @db.Uuid
+  approvalId String?          @map("approval_id") @db.Uuid
+  actorId    String           @map("actor_id") @db.Uuid
+  action     String
+  comments   String?
+  actedAt    DateTime         @default(now()) @map("acted_at")
+  request    Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approval   RequestApproval? @relation(fields: [approvalId], references: [id])
+  actor      User             @relation(fields: [actorId], references: [id])
+
+  @@map("approval_actions")
+}
+
+model SapS4Config {
+  id                  String   @id @default(uuid()) @db.Uuid
+  formCode            String   @map("form_code")
+  subcategory         String
+  descriptionRequired Boolean  @default(false) @map("description_required")
+  attachmentRequired  Boolean  @default(false) @map("attachment_required")
+  approvalRoute       Json     @map("approval_route")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  form                Form     @relation(fields: [formCode], references: [code])
+
+  @@unique([formCode, subcategory])
+  @@map("sap_s4_configs")
+}
+
+model Attachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestId  String   @map("request_id") @db.Uuid
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  fileSizeMb Decimal? @map("file_size_mb") @db.Decimal(10, 2)
+  mimeType   String?  @map("mime_type")
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  isDeleted  Boolean  @default(false) @map("is_deleted")
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+
+  @@map("attachments")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestId  String?  @map("request_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  moduleCode String?  @map("module_code")
+  actionType String   @map("action_type")
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id") @db.Uuid
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  request    Request? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([moduleCode, actionType])
+  @@map("audit_logs")
+}
+
+model EmailOutbox {
+  id           String             @id @default(uuid()) @db.Uuid
+  requestId    String?            @map("request_id") @db.Uuid
+  toEmail      String             @map("to_email")
+  ccEmail      String?            @map("cc_email")
+  subject      String
+  body         String
+  status       String             @default("queued")
+  errorMessage String?            @map("error_message")
+  sentAt       DateTime?          @map("sent_at")
+  attempts     Int                @default(0)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  request      Request?           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actionTokens EmailActionToken[]
+
+  @@index([status, createdAt])
+  @@map("email_outbox")
+}
+
+model EmailActionToken {
+  id         String           @id @default(uuid()) @db.Uuid
+  requestId  String           @map("request_id") @db.Uuid
+  approvalId String?          @map("approval_id") @db.Uuid
+  emailId    String?          @map("email_id") @db.Uuid
+  tokenHash  String           @unique @map("token_hash")
+  purpose    String
+  status     String           @default("active")
+  expiresAt  DateTime         @map("expires_at")
+  usedAt     DateTime?        @map("used_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  request    Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approval   RequestApproval? @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  email      EmailOutbox?     @relation(fields: [emailId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, status])
+  @@index([approvalId, status])
+  @@map("email_action_tokens")
+}
+
