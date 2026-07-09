@@ -2,6 +2,9 @@ export const roleCodes = ["REQUESTER", "FINANCE", "APPROVER", "IT", "ADMIN"] as 
 
 export type RoleCode = (typeof roleCodes)[number];
 
+export const sapModuleCode = "SAP_S4_HANA";
+export const sapRequestFormCode = "SAP_S4_REQUEST";
+
 export const requestStatuses = [
   "Draft",
   "Pending Approval",
@@ -35,8 +38,8 @@ export const requestTypes = [
   {
     code: "SAP_S4",
     label: "SAP S4 HANA Request",
-    moduleCode: "SAP_S4_HANA",
-    formCode: "SAP_S4_REQUEST",
+    moduleCode: sapModuleCode,
+    formCode: sapRequestFormCode,
     purpose: "For SAP S4 HANA finance-related approval requests",
   },
 ] as const;
