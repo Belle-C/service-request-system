@@ -70,6 +70,7 @@ model Form {
   module       Module        @relation(fields: [moduleId], references: [id])
   requests     Request[]
   configs      SapS4Config[]
+  sapSettings  SapS4GlobalSetting?
 
   @@map("forms")
 }
@@ -152,8 +153,6 @@ model SapS4Config {
   id                  String   @id @default(uuid()) @db.Uuid
   formCode            String   @map("form_code")
   subcategory         String
-  descriptionRequired Boolean  @default(false) @map("description_required")
-  attachmentRequired  Boolean  @default(false) @map("attachment_required")
   approvalRoute       Json     @map("approval_route")
   isActive            Boolean  @default(true) @map("is_active")
   createdAt           DateTime @default(now()) @map("created_at")
@@ -162,6 +161,17 @@ model SapS4Config {
 
   @@unique([formCode, subcategory])
   @@map("sap_s4_configs")
+}
+
+model SapS4GlobalSetting {
+  id                  String   @id @default(uuid()) @db.Uuid
+  formCode            String   @unique @map("form_code")
+  descriptionRequired Boolean  @default(false) @map("description_required")
+  attachmentRequired  Boolean  @default(false) @map("attachment_required")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  form                Form     @relation(fields: [formCode], references: [code])
+
+  @@map("sap_s4_global_settings")
 }
 
 model Attachment {
@@ -235,4 +245,3 @@ model EmailActionToken {
   @@index([approvalId, status])
   @@map("email_action_tokens")
 }
-
