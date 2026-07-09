@@ -19,7 +19,7 @@ async function main() {
     create: { code: "SAP_S4_HANA", name: "SAP S4 HANA", displayOrder: 1 },
   });
 
-  await prisma.form.upsert({
+  const sapForm = await prisma.form.upsert({
     where: { code: "SAP_S4_REQUEST" },
     update: {},
     create: {
@@ -27,6 +27,68 @@ async function main() {
       name: "SAP S4 HANA Request",
       moduleId: sapModule.id,
       displayOrder: 1,
+    },
+  });
+
+  const [belle, approver, finance] = await Promise.all([
+    prisma.user.upsert({
+      where: { email: "belle.chong@cora-environment.com" },
+      update: {},
+      create: {
+        name: "Belle Chong",
+        email: "belle.chong@cora-environment.com",
+        jobTitle: "Requester",
+        department: "Information Technology",
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "approver@cora-environment.com" },
+      update: {},
+      create: {
+        name: "Jason Chan",
+        email: "approver@cora-environment.com",
+        jobTitle: "Manager",
+        department: "Finance",
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "finance@cora-environment.com" },
+      update: {},
+      create: {
+        name: "Finance User",
+        email: "finance@cora-environment.com",
+        jobTitle: "Finance",
+        department: "Finance",
+      },
+    }),
+  ]);
+
+  for (const [user, roleCode] of [
+    [belle, "REQUESTER"],
+    [approver, "APPROVER"],
+    [finance, "FINANCE"],
+  ] as const) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { code: roleCode } });
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: { isActive: true },
+      create: { userId: user.id, roleId: role.id },
+    });
+  }
+
+  await prisma.sapS4GlobalSetting.upsert({
+    where: { formCode: sapForm.code },
+    update: {},
+    create: { formCode: sapForm.code, descriptionRequired: true, attachmentRequired: false },
+  });
+
+  await prisma.sapS4Config.upsert({
+    where: { formCode_subcategory: { formCode: sapForm.code, subcategory: "Credit Note" } },
+    update: { approvalRoute: { levels: [{ approverId: approver.id }] } },
+    create: {
+      formCode: sapForm.code,
+      subcategory: "Credit Note",
+      approvalRoute: { levels: [{ approverId: approver.id }] },
     },
   });
 
