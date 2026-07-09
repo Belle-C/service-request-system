@@ -1,4 +1,1 @@
-export const roles = ["REQUESTER", "FINANCE", "APPROVER", "IT", "ADMIN"] as const;
-
-export type RoleCode = (typeof roles)[number];
-
+export { roleCodes as roles, type RoleCode } from "./service-request";

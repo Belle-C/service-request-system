@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
-
-const requestTypes = [
-  "Digital Support Request",
-  "Application Enhancement Request",
-  "Offboarding Request",
-  "SAP S4 HANA Request",
-];
+import { requestTypes } from "@/lib/service-request";
 
 export default function Home() {
   return (
@@ -45,9 +39,10 @@ export default function Home() {
             <Link
               className="rounded-md border border-[var(--border)] bg-white p-4 transition hover:border-[var(--primary)]"
               href="/new-request"
-              key={type}
+              key={type.code}
             >
-              <span className="font-medium">{type}</span>
+              <span className="font-medium">{type.label}</span>
+              <span className="mt-1 block text-sm text-[var(--muted)]">{type.purpose}</span>
             </Link>
           ))}
         </div>
@@ -55,4 +50,3 @@ export default function Home() {
     </main>
   );
 }
-
