@@ -22,19 +22,43 @@ interface NewRequestFormProps {
   isOffline: boolean;
 }
 
-export default function NewRequestForm({ configs, settings, isOffline }: NewRequestFormProps) {
+// Static metadata for the type cards
+const typeCardMeta: Record<string, { icon: string; purpose: string; isSap?: boolean }> = {
+  DIGITAL_SUPPORT: {
+    icon: "🖥️",
+    purpose: "IT helpdesk, device provisioning, and digital tooling issues.",
+  },
+  APP_ENHANCEMENT: {
+    icon: "⚙️",
+    purpose: "Request new features, integrations, or application improvements.",
+  },
+  OFFBOARDING: {
+    icon: "👤",
+    purpose: "End-to-end employee offboarding and access deprovisioning.",
+  },
+  SAP_S4: {
+    icon: "📊",
+    purpose: "Finance workflow submissions routed through SAP S4 HANA.",
+    isSap: true,
+  },
+};
+
+export default function NewRequestForm({
+  configs,
+  settings,
+  isOffline,
+}: NewRequestFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser } = useRole();
 
-  const activeType = searchParams.get("type") || "SAP_S4";
+  const activeType = searchParams.get("type") || "";
 
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const subcategoryRef = useRef<HTMLSelectElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync current simulated user into the form fields
   useEffect(() => {
     if (currentUser) {
       if (nameRef.current) nameRef.current.value = currentUser.name || "";
@@ -42,7 +66,10 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
     }
   }, [currentUser]);
 
-  const setStatus = (type: "idle" | "loading" | "success" | "error", message: string) => {
+  const setStatus = (
+    type: "idle" | "loading" | "success" | "error",
+    message: string
+  ) => {
     const el = document.getElementById("form-status-alert");
     if (!el) return;
 
@@ -50,13 +77,13 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
       el.className = "hidden";
       el.innerText = "";
     } else if (type === "loading") {
-      el.className = "mb-6 rounded-md bg-blue-50 border border-blue-200 p-4 text-sm text-blue-700 font-medium animate-pulse";
+      el.className = "alert alert-loading";
       el.innerText = message;
     } else if (type === "success") {
-      el.className = "mb-6 rounded-md bg-green-50 border border-green-200 p-4 text-sm text-green-700 font-medium";
+      el.className = "alert alert-success";
       el.innerText = message;
-    } else if (type === "error") {
-      el.className = "mb-6 rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700 font-medium";
+    } else {
+      el.className = "alert alert-error";
       el.innerText = message;
     }
   };
@@ -77,7 +104,7 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
       return;
     }
 
-    setStatus("loading", "Saving draft...");
+    setStatus("loading", "Saving draft…");
 
     try {
       const res = await fetch("/api/requests/drafts", {
@@ -87,15 +114,15 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save draft");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to save draft");
 
-      setStatus("success", `Draft saved successfully! Ticket: ${data.ticketNo}`);
-      // Clear form except name/email
+      setStatus("success", `Draft saved! Ticket: ${data.ticketNo}`);
       if (descriptionRef.current) descriptionRef.current.value = "";
     } catch (err) {
-      setStatus("error", err instanceof Error ? err.message : "Error saving draft");
+      setStatus(
+        "error",
+        err instanceof Error ? err.message : "Error saving draft"
+      );
     }
   };
 
@@ -122,10 +149,9 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
       return;
     }
 
-    setStatus("loading", "Initiating submission (creating draft first)...");
+    setStatus("loading", "Creating request draft…");
 
     try {
-      // 1. Create Draft
       const draftRes = await fetch("/api/requests/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,11 +160,10 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
 
       const draftData = await draftRes.json();
       if (!draftRes.ok) {
-        throw new Error(draftData.error || "Failed to create draft for submission");
+        throw new Error(draftData.error || "Failed to create draft");
       }
 
-      // 2. Submit Draft
-      setStatus("loading", `Draft created (${draftData.ticketNo}). Submitting request...`);
+      setStatus("loading", `Draft ${draftData.ticketNo} created. Submitting…`);
 
       const submitRes = await fetch(`/api/requests/${draftData.id}/submit`, {
         method: "POST",
@@ -151,159 +176,380 @@ export default function NewRequestForm({ configs, settings, isOffline }: NewRequ
         throw new Error(submitData.error || "Failed to submit request");
       }
 
-      setStatus("success", `Request submitted successfully! Ticket: ${submitData.ticketNo}`);
-      
-      // Redirect after success
+      setStatus(
+        "success",
+        `Request submitted! Ticket: ${submitData.ticketNo}`
+      );
       setTimeout(() => {
         router.push("/my-requests");
       }, 1500);
     } catch (err) {
-      setStatus("error", err instanceof Error ? err.message : "Error submitting request");
+      setStatus(
+        "error",
+        err instanceof Error ? err.message : "Error submitting request"
+      );
     }
   };
 
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleSelectType = (code: string) => {
     setStatus("idle", "");
-    const value = e.target.value;
-    router.push(`/new-request?type=${value}`);
+    router.push(`/new-request?type=${code}`);
   };
 
+  const isSapSelected = activeType === "SAP_S4";
+
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+      {/* Offline warning */}
       {isOffline && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-xs">
-          <p className="font-semibold flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500 animate-pulse"></span>
-            Database Offline
+        <div className="offline-banner">
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>
+              Database Offline
+            </p>
+            <p style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>
+              Form is in read-only offline mode. Submissions are currently
+              disabled.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Status alert */}
+      <div id="form-status-alert" className="hidden" />
+
+      {/* Step 1: Select Category */}
+      <section>
+        <div style={{ marginBottom: 16 }}>
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 800,
+              color: "var(--primary)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Step 1 — Select Request Category
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+            Click a card to choose your request type. Only SAP S4 HANA supports
+            automated workflow submissions.
           </p>
-          <p className="mt-1 text-xs">
-            Form is in read-only offline mode because the database connection is currently down.
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: 14,
+            gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+          }}
+        >
+          {requestTypes.map((type) => {
+            const meta = typeCardMeta[type.code] || {
+              icon: "📝",
+              purpose: type.purpose,
+            };
+            const isSelected = activeType === type.code;
+            const isSap = meta.isSap;
+
+            return (
+              <button
+                key={type.code}
+                id={`type-card-${type.code.toLowerCase()}`}
+                onClick={() => handleSelectType(type.code)}
+                className={`request-type-card ${isSap ? "is-sap" : ""} ${
+                  isSelected ? "is-selected" : ""
+                }`}
+                type="button"
+                style={{ textAlign: "left", width: "100%" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>
+                    {meta.icon}
+                  </span>
+                  <span className="rtc-module-tag">{type.moduleCode}</span>
+                </div>
+                <div>
+                  <p className="rtc-title">{type.label}</p>
+                  <p className="rtc-purpose" style={{ marginTop: 6 }}>
+                    {meta.purpose}
+                  </p>
+                </div>
+                <p className="rtc-cta">
+                  {isSelected ? "Selected ✓" : "Select →"}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Step 2: Form (only for SAP_S4) */}
+      {activeType && !isSapSelected && (
+        <div
+          className="card"
+          style={{
+            padding: "40px 32px",
+            textAlign: "center",
+            borderStyle: "dashed",
+          }}
+        >
+          <p style={{ fontSize: 28, marginBottom: 16 }}>🚧</p>
+          <p
+            style={{ fontSize: 15, fontWeight: 700, color: "var(--primary)" }}
+          >
+            Form Not Yet Available
+          </p>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--muted)",
+              marginTop: 8,
+              maxWidth: 380,
+              marginLeft: "auto",
+              marginRight: "auto",
+              lineHeight: 1.7,
+            }}
+          >
+            The &ldquo;
+            {requestTypes.find((t) => t.code === activeType)?.label}&rdquo; form
+            is not yet configured for automated submissions. Please select{" "}
+            <strong>SAP S4 HANA Request</strong> to submit a request.
           </p>
         </div>
       )}
 
-      {/* Status messages display here */}
-      <div id="form-status-alert" className="hidden" />
+      {isSapSelected && (
+        <section>
+          <div style={{ marginBottom: 16 }}>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: "var(--primary)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Step 2 — SAP S4 HANA Finance Request
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+              Complete the form below. Your submission will be routed through the
+              configured approval workflow.
+            </p>
+          </div>
 
-      {/* Category selector card */}
-      <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-xs">
-        <h2 className="text-lg font-semibold text-[var(--primary)] mb-4">Request Category</h2>
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]" htmlFor="category-select">
-            Select Form Category
-          </label>
-          <select
-            id="category-select"
-            value={activeType}
-            onChange={handleCategoryChange}
-            className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--primary)] focus:border-[var(--primary)] focus:outline-hidden cursor-pointer"
+          <form
+            id="sap-request-form"
+            onSubmit={handleSubmit}
+            className="card-elevated"
+            style={{ padding: "28px 28px 24px" }}
           >
-            {requestTypes.map((type) => (
-              <option key={type.code} value={type.code}>
-                {type.label} ({type.moduleCode})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Form Area */}
-      {activeType === "SAP_S4" ? (
-        <form onSubmit={handleSubmit} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-xs space-y-5">
-          <div className="border-b border-[var(--border)] pb-3">
-            <h2 className="text-lg font-semibold text-[var(--primary)]">SAP S4 HANA Finance Form</h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5">Please provide request details for finance routing.</p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]" htmlFor="req-name">
-                Requester Name
-              </label>
-              <input
-                id="req-name"
-                ref={nameRef}
-                type="text"
-                disabled={isOffline}
-                required
-                className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-hidden disabled:opacity-60"
-              />
+            {/* Requester Details */}
+            <div
+              style={{
+                marginBottom: 24,
+                paddingBottom: 24,
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: 16,
+                }}
+              >
+                Requester Information
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 16,
+                  gridTemplateColumns: "1fr 1fr",
+                }}
+              >
+                <div>
+                  <label className="field-label" htmlFor="req-name">
+                    Full Name <span style={{ color: "#dc2626" }}>*</span>
+                  </label>
+                  <input
+                    id="req-name"
+                    ref={nameRef}
+                    type="text"
+                    disabled={isOffline}
+                    required
+                    placeholder="e.g. Belle Chong"
+                    className="field-input"
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="req-email">
+                    Email Address <span style={{ color: "#dc2626" }}>*</span>
+                  </label>
+                  <input
+                    id="req-email"
+                    ref={emailRef}
+                    type="email"
+                    disabled={isOffline}
+                    required
+                    placeholder="e.g. you@cora-environment.com"
+                    className="field-input"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]" htmlFor="req-email">
-                Requester Email
-              </label>
-              <input
-                id="req-email"
-                ref={emailRef}
-                type="email"
-                disabled={isOffline}
-                required
-                className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-hidden disabled:opacity-60"
-              />
+
+            {/* Request Details */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <h3
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Request Details
+              </h3>
+
+              <div>
+                <label className="field-label" htmlFor="req-subcategory">
+                  Subcategory <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <select
+                  id="req-subcategory"
+                  ref={subcategoryRef}
+                  disabled={isOffline}
+                  required
+                  className="field-input"
+                  style={{ cursor: "pointer" }}
+                >
+                  <option value="">— Choose Subcategory —</option>
+                  {configs.map((config) => (
+                    <option key={config.id} value={config.subcategory}>
+                      {config.subcategory}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="req-description">
+                  Description{" "}
+                  {settings?.descriptionRequired && (
+                    <span style={{ color: "#dc2626" }}>*</span>
+                  )}
+                  {!settings?.descriptionRequired && (
+                    <span
+                      style={{
+                        fontWeight: 400,
+                        textTransform: "none",
+                        fontSize: 11,
+                        color: "var(--muted-light)",
+                        marginLeft: 4,
+                      }}
+                    >
+                      (optional)
+                    </span>
+                  )}
+                </label>
+                <textarea
+                  id="req-description"
+                  ref={descriptionRef}
+                  rows={5}
+                  disabled={isOffline}
+                  required={settings?.descriptionRequired}
+                  placeholder="Provide a detailed explanation of your request, including any supporting context or reference numbers…"
+                  className="field-input"
+                  style={{ resize: "vertical" }}
+                />
+              </div>
+
+              {settings && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 16,
+                    padding: "12px 16px",
+                    background: "var(--surface-raised)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <span
+                    style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}
+                  >
+                    Form rules:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: settings.descriptionRequired
+                        ? "var(--primary)"
+                        : "var(--muted)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Description {settings.descriptionRequired ? "required ✓" : "optional"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: settings.attachmentRequired
+                        ? "var(--primary)"
+                        : "var(--muted)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Attachment {settings.attachmentRequired ? "required ✓" : "optional"}
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]" htmlFor="req-subcategory">
-              Subcategory
-            </label>
-            <select
-              id="req-subcategory"
-              ref={subcategoryRef}
-              disabled={isOffline}
-              required
-              className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-hidden disabled:opacity-60 cursor-pointer"
+            {/* Actions */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                justifyContent: "flex-end",
+                marginTop: 28,
+                paddingTop: 20,
+                borderTop: "1px solid var(--border)",
+              }}
             >
-              <option value="">-- Choose Subcategory --</option>
-              {configs.map((config) => (
-                <option key={config.id} value={config.subcategory}>
-                  {config.subcategory}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]" htmlFor="req-description">
-              Description {settings?.descriptionRequired && <span className="text-red-500">*</span>}
-            </label>
-            <textarea
-              id="req-description"
-              ref={descriptionRef}
-              rows={4}
-              disabled={isOffline}
-              required={settings?.descriptionRequired}
-              placeholder="Provide a detailed explanation of your request..."
-              className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-hidden disabled:opacity-60"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-3 justify-end border-t border-[var(--border)] pt-4">
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={isOffline}
-              className="rounded-md border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--surface-muted)] transition cursor-pointer disabled:opacity-50"
-            >
-              Save as Draft
-            </button>
-            <button
-              type="submit"
-              disabled={isOffline}
-              className="rounded-md bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 transition cursor-pointer disabled:opacity-50"
-            >
-              Submit Request
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-white p-8 text-center shadow-xs">
-          <p className="text-sm font-semibold text-[var(--primary)]">Form Not Configured</p>
-          <p className="mt-2 text-xs text-[var(--muted)] max-w-md mx-auto leading-relaxed">
-            The category &quot;{requestTypes.find((t) => t.code === activeType)?.label}&quot; is currently not supported for automated workflow submissions. Please select &quot;SAP S4 HANA Request&quot; to test form submissions.
-          </p>
-        </div>
+              <button
+                type="button"
+                id="save-draft-btn"
+                onClick={handleSaveDraft}
+                disabled={isOffline}
+                className="btn btn-ghost"
+              >
+                Save as Draft
+              </button>
+              <button
+                type="submit"
+                id="submit-request-btn"
+                disabled={isOffline}
+                className="btn btn-primary"
+              >
+                Submit Request →
+              </button>
+            </div>
+          </form>
+        </section>
       )}
     </div>
   );

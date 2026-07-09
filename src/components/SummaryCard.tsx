@@ -1,9 +1,24 @@
-export function SummaryCard({ label, value }: { label: string; value: string }) {
+interface SummaryCardProps {
+  label: string;
+  value: string;
+  accent?: "primary" | "green" | "blue" | "purple";
+}
+
+export function SummaryCard({ label, value, accent = "primary" }: SummaryCardProps) {
+  const accentLine: Record<string, string> = {
+    primary: "#003138",
+    green: "#6fd85d",
+    blue: "#0077bf",
+    purple: "#7561c8",
+  };
+
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-[var(--muted)]">{label}</p>
-      <p className="mt-3 text-3xl font-semibold text-[var(--primary)]">{value}</p>
+    <article
+      className="metric-card"
+      style={{ borderTop: `3px solid ${accentLine[accent]}` }}
+    >
+      <p className="metric-label">{label}</p>
+      <p className="metric-value">{value}</p>
     </article>
   );
 }
-

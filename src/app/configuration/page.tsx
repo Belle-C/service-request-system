@@ -6,7 +6,8 @@ import ConfigurationClient from "@/components/ConfigurationClient";
 export const dynamic = "force-dynamic";
 
 export default async function ConfigurationPage() {
-  let settings: { descriptionRequired: boolean; attachmentRequired: boolean } | null = null;
+  let settings: { descriptionRequired: boolean; attachmentRequired: boolean } | null =
+    null;
   let configs: React.ComponentProps<typeof ConfigurationClient>["configs"] = [];
   let users: React.ComponentProps<typeof ConfigurationClient>["users"] = [];
   let isOffline = false;
@@ -25,7 +26,9 @@ export default async function ConfigurationPage() {
       orderBy: { subcategory: "asc" },
     });
 
-    configs = dbConfigs as unknown as React.ComponentProps<typeof ConfigurationClient>["configs"];
+    configs = dbConfigs as unknown as React.ComponentProps<
+      typeof ConfigurationClient
+    >["configs"];
 
     const dbUsers = await prisma.user.findMany({
       orderBy: { name: "asc" },
@@ -54,16 +57,13 @@ export default async function ConfigurationPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <section className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Workflow Management
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
-          SAP S4 HANA Configuration
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Configure global document rule controls and approval level flows for incoming finance requests.
+    <main className="page-container page-main">
+      <section style={{ marginBottom: 36 }}>
+        <p className="page-eyebrow">Workflow Management</p>
+        <h1 className="page-title">SAP S4 HANA Configuration</h1>
+        <p className="page-subtitle">
+          Configure global document rules and approval routing for all incoming
+          finance requests.
         </p>
       </section>
 

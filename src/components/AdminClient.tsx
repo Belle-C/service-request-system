@@ -29,30 +29,46 @@ interface AdminClientProps {
   isOffline: boolean;
 }
 
+const roleColorMap: Record<string, string> = {
+  REQUESTER: "#e6f2f3",
+  FINANCE: "#edfae9",
+  APPROVER: "#e6f3fb",
+  APPROVER_L2: "#f0edf9",
+  IT: "#fffbeb",
+  ADMIN: "#fef2f2",
+};
+
+const roleTextMap: Record<string, string> = {
+  REQUESTER: "#003138",
+  FINANCE: "#15803d",
+  APPROVER: "#0077bf",
+  APPROVER_L2: "#7561c8",
+  IT: "#b45309",
+  ADMIN: "#dc2626",
+};
+
 export default function AdminClient({ users, logs, isOffline }: AdminClientProps) {
   const router = useRouter();
   const { selectedRole } = useRole();
   const [isPending, startTransition] = useTransition();
 
-  // Allowed React states
   const [tab, setTab] = useState<"users" | "logs">("users");
-  const [selectedRow, setSelectedRow] = useState<string | null>(null); // selected userId for role editing
+  const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [logSearch, setLogSearch] = useState("");
 
-  const setDrawerAlert = (type: "success" | "error" | "loading" | "idle", message: string) => {
+  const setDrawerAlert = (
+    type: "success" | "error" | "loading" | "idle",
+    message: string
+  ) => {
     const el = document.getElementById("admin-drawer-alert");
     if (!el) return;
-
     if (type === "idle") {
       el.className = "hidden";
       el.innerText = "";
     } else {
-      el.className = `p-3 rounded-md text-xs font-semibold mb-4 ${
-        type === "loading"
-          ? "bg-blue-50 text-blue-700 border border-blue-200 animate-pulse"
-          : type === "success"
-          ? "bg-green-50 text-green-700 border border-green-200"
-          : "bg-red-50 text-red-700 border border-red-200"
+      el.className = `alert alert-${
+        type === "loading" ? "loading" : type === "success" ? "success" : "error"
       }`;
       el.innerText = message;
     }
@@ -62,12 +78,11 @@ export default function AdminClient({ users, logs, isOffline }: AdminClientProps
     e.preventDefault();
     if (!selectedRow || isOffline) return;
 
-    // Get checked roles from DOM
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
     const checkedRoles = formData.getAll("roles") as RoleCode[];
 
-    setDrawerAlert("loading", "Updating user roles...");
+    setDrawerAlert("loading", "Updating user roles…");
 
     try {
       const res = await fetch(`/api/users/${selectedRow}/roles`, {
@@ -77,23 +92,22 @@ export default function AdminClient({ users, logs, isOffline }: AdminClientProps
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update roles");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to update roles");
 
       setDrawerAlert("success", "Roles updated successfully!");
-      
       startTransition(() => {
         router.refresh();
       });
-
       setTimeout(() => {
         setDrawerAlert("idle", "");
         setDrawerOpen(false);
         setSelectedRow(null);
       }, 1200);
     } catch (err) {
-      setDrawerAlert("error", err instanceof Error ? err.message : "Error updating roles");
+      setDrawerAlert(
+        "error",
+        err instanceof Error ? err.message : "Error updating roles"
+      );
     }
   };
 
@@ -109,258 +123,550 @@ export default function AdminClient({ users, logs, isOffline }: AdminClientProps
 
   const selectedUser = users.find((u) => u.id === selectedRow);
 
+  const filteredLogs = logSearch.trim()
+    ? logs.filter(
+        (l) =>
+          l.actionType.toLowerCase().includes(logSearch.toLowerCase()) ||
+          l.actor.name.toLowerCase().includes(logSearch.toLowerCase()) ||
+          (l.request?.ticketNo || "").toLowerCase().includes(logSearch.toLowerCase())
+      )
+    : logs;
+
   return (
-    <div className="space-y-6">
+    <div>
       {selectedRole !== "ADMIN" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-xs mb-4">
-          <p className="font-semibold">Simulated Role Warning</p>
-          <p className="mt-1 text-xs">
-            Admin console operations require the <strong>ADMIN</strong> role. Please select &quot;Admin Mode&quot; in the header to fully simulate portal controls.
-          </p>
+        <div className="alert alert-warning" style={{ marginBottom: 20 }}>
+          <strong>Role Warning:</strong> Admin operations require the{" "}
+          <strong>ADMIN</strong> role. Select &ldquo;Admin&rdquo; in the header
+          to enable portal controls.
         </div>
       )}
 
       {isOffline && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-xs">
-          <p className="font-semibold flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500 animate-pulse"></span>
-            Offline Mode
-          </p>
-          <p className="mt-1 text-xs">
-            Viewing cached local interface. Database mutations and audit lists are locked.
-          </p>
-        </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-        
-        {/* Left Side Menu */}
-        <aside className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-xs h-fit space-y-1">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted)] px-3 mb-2">
-            Admin Navigation
-          </p>
-          <button
-            onClick={() => setTab("users")}
-            className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-md transition ${
-              tab === "users"
-                ? "bg-[var(--surface-muted)] text-[var(--primary)] font-bold"
-                : "text-[var(--muted)] hover:text-[var(--primary)]"
-            }`}
-          >
-            User & Role Management
-          </button>
-          <button
-            onClick={() => setTab("logs")}
-            className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-md transition ${
-              tab === "logs"
-                ? "bg-[var(--surface-muted)] text-[var(--primary)] font-bold"
-                : "text-[var(--muted)] hover:text-[var(--primary)]"
-            }`}
-          >
-            Audit Logs Monitor
-          </button>
-        </aside>
-
-        {/* Right Content Panel */}
-        <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-xs min-h-[400px]">
-          
-          {tab === "users" ? (
-            <div className="space-y-4">
-              <div className="border-b border-[var(--border)] pb-3">
-                <h2 className="text-lg font-bold text-[var(--primary)]">User & Role Management</h2>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Assign access privileges across service modules.</p>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[var(--border)] text-left text-xs">
-                  <thead className="bg-[var(--surface-muted)] font-semibold text-[var(--muted)] uppercase">
-                    <tr>
-                      <th className="px-4 py-3">User</th>
-                      <th className="px-4 py-3">Job Details</th>
-                      <th className="px-4 py-3">Active Roles</th>
-                      <th className="px-4 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)] bg-white text-[var(--text)]">
-                    {users.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-[var(--muted)]">No users found.</td>
-                      </tr>
-                    ) : (
-                      users.map((u) => (
-                        <tr key={u.id} className="hover:bg-[var(--surface-muted)] transition">
-                          <td className="px-4 py-3.5">
-                            <div className="font-semibold">{u.name}</div>
-                            <div className="text-[10px] text-[var(--muted)]">{u.email}</div>
-                          </td>
-                          <td className="px-4 py-3.5 text-[10px]">
-                            <div>{u.jobTitle || "N/A"}</div>
-                            <div className="text-[var(--muted)]">{u.department || ""}</div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex flex-wrap gap-1">
-                              {u.roles.map((r) => (
-                                <span
-                                  key={r}
-                                  className="px-1.5 py-0.5 rounded-sm text-[9px] font-bold bg-[var(--surface-muted)] text-[var(--primary)] border border-[var(--border)]"
-                                >
-                                  {r}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 text-right">
-                            <button
-                              onClick={() => openEditRoles(u.id)}
-                              disabled={isOffline}
-                              className="text-xs font-semibold text-[var(--primary)] hover:underline cursor-pointer disabled:opacity-50"
-                            >
-                              Edit Roles
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="border-b border-[var(--border)] pb-3">
-                <h2 className="text-lg font-bold text-[var(--primary)]">Audit Logs Monitor</h2>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Real-time recording of request modifications and approval routes.</p>
-              </div>
-
-              <div className="overflow-x-auto max-h-[500px]">
-                <table className="min-w-full divide-y divide-[var(--border)] text-left text-xs">
-                  <thead className="bg-[var(--surface-muted)] font-semibold text-[var(--muted)] uppercase">
-                    <tr>
-                      <th className="px-4 py-3">Timestamp</th>
-                      <th className="px-4 py-3">Actor</th>
-                      <th className="px-4 py-3">Action</th>
-                      <th className="px-4 py-3">Ticket</th>
-                      <th className="px-4 py-3">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)] bg-white text-[var(--text)]">
-                    {logs.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-[var(--muted)]">No audit logs found.</td>
-                      </tr>
-                    ) : (
-                      logs.map((log) => (
-                        <tr key={log.id} className="hover:bg-[var(--surface-muted)] transition">
-                          <td className="px-4 py-3 whitespace-nowrap text-[10px] text-[var(--muted)]">
-                            {new Date(log.createdAt).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-semibold">{log.actor.name}</div>
-                            <div className="text-[9px] text-[var(--muted)]">{log.actor.email}</div>
-                          </td>
-                          <td className="px-4 py-3 font-medium text-[var(--primary)]">{log.actionType}</td>
-                          <td className="px-4 py-3 font-semibold text-[var(--primary)]">
-                            {log.request?.ticketNo || "N/A"}
-                          </td>
-                          <td className="px-4 py-3 text-[10px] text-[var(--muted)] max-w-xs truncate">
-                            {JSON.stringify(log.details)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-        </section>
-      </div>
-
-      {/* Role Edit Drawer */}
-      {drawerOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className="absolute inset-0 bg-black/35 backdrop-blur-xs transition-opacity" onClick={closeDrawer} />
-
-          <div className="absolute inset-y-0 right-0 flex max-w-full pl-10">
-            <form
-              onSubmit={handleUpdateRoles}
-              className="w-screen max-w-md transform bg-white p-6 shadow-xl transition-all flex flex-col justify-between border-l border-[var(--border)]"
-            >
-              <div className="overflow-y-auto space-y-6 flex-1 pr-1">
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">
-                      Privilege Console
-                    </span>
-                    <h3 className="text-lg font-bold text-[var(--primary)] mt-0.5">
-                      Edit Roles: {selectedUser.name}
-                    </h3>
-                  </div>
-                  <button
-                    onClick={closeDrawer}
-                    type="button"
-                    className="rounded-md p-1.5 text-[var(--muted)] hover:bg-[var(--surface-muted)] transition cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div id="admin-drawer-alert" className="hidden" />
-
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-[var(--surface-muted)] p-4 border border-[var(--border)]">
-                    <p className="text-xs font-semibold text-[var(--primary)]">{selectedUser.jobTitle || "Job Title N/A"}</p>
-                    <p className="text-[10px] text-[var(--muted)] mt-0.5">{selectedUser.email}</p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-3">
-                      Select Permitted System Roles
-                    </h4>
-                    <div className="flex flex-col gap-3">
-                      {roleCodes.map((code) => {
-                        const hasRole = selectedUser.roles.includes(code);
-                        return (
-                          <label key={code} className="flex items-center gap-3 text-sm font-medium text-[var(--text)] select-none cursor-pointer">
-                            <input
-                              type="checkbox"
-                              name="roles"
-                              value={code}
-                              defaultChecked={hasRole}
-                              className="size-4 rounded-sm border-[var(--border)] cursor-pointer"
-                            />
-                            <span>{code} Mode</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-[var(--border)] pt-4 mt-6 flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeDrawer}
-                  className="flex-1 rounded-md border border-[var(--border)] bg-white py-2.5 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--surface-muted)] transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex-1 rounded-md bg-[var(--primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90 transition cursor-pointer"
-                >
-                  Save Roles
-                </button>
-              </div>
-
-            </form>
+        <div className="offline-banner">
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>
+              Offline Mode
+            </p>
+            <p style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>
+              Viewing cached interface. Database mutations are locked.
+            </p>
           </div>
         </div>
       )}
 
+      <div className="sidebar-layout">
+        {/* Left rail */}
+        <div>
+          <nav className="sidebar-nav">
+            <p className="sidebar-nav-label">Admin</p>
+            <button
+              id="nav-users"
+              onClick={() => setTab("users")}
+              className={`sidebar-nav-btn ${tab === "users" ? "is-active" : ""}`}
+            >
+              <span>👥</span> Users &amp; Roles
+              {users.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: "var(--primary-light)",
+                    color: "var(--primary)",
+                    borderRadius: 9999,
+                    padding: "1px 6px",
+                  }}
+                >
+                  {users.length}
+                </span>
+              )}
+            </button>
+            <button
+              id="nav-audit-logs"
+              onClick={() => setTab("logs")}
+              className={`sidebar-nav-btn ${tab === "logs" ? "is-active" : ""}`}
+            >
+              <span>📋</span> Audit Logs
+              {logs.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: "var(--primary-light)",
+                    color: "var(--primary)",
+                    borderRadius: 9999,
+                    padding: "1px 6px",
+                  }}
+                >
+                  {logs.length}
+                </span>
+              )}
+            </button>
+          </nav>
+        </div>
+
+        {/* Content panel */}
+        <div>
+          {tab === "users" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: "var(--primary)",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    User &amp; Role Management
+                  </h2>
+                  <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
+                    Assign access privileges across service modules.
+                  </p>
+                </div>
+              </div>
+
+              <div className="card" style={{ overflow: "hidden" }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Job Details</th>
+                        <th>Active Roles</th>
+                        <th style={{ textAlign: "right" }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.length === 0 ? (
+                        <tr>
+                          <td colSpan={4}>
+                            <div className="empty-state">
+                              <p className="empty-state-icon">👥</p>
+                              <p className="empty-state-title">No users found</p>
+                              <p className="empty-state-body">
+                                No users are available in the database.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        users.map((u) => (
+                          <tr key={u.id}>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "50%",
+                                    background: "var(--primary-light)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: "var(--primary)",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {u.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p
+                                    style={{ fontWeight: 600, color: "var(--text)" }}
+                                  >
+                                    {u.name}
+                                  </p>
+                                  <p
+                                    style={{
+                                      fontSize: 11,
+                                      color: "var(--muted)",
+                                    }}
+                                  >
+                                    {u.email}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <p style={{ fontSize: 12, color: "var(--text)" }}>
+                                {u.jobTitle || "—"}
+                              </p>
+                              {u.department && (
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: "var(--muted)",
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {u.department}
+                                </p>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                {u.roles.map((r) => (
+                                  <span
+                                    key={r}
+                                    style={{
+                                      padding: "2px 8px",
+                                      borderRadius: "var(--radius-sm)",
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      letterSpacing: "0.04em",
+                                      textTransform: "uppercase",
+                                      background: roleColorMap[r] || "var(--primary-light)",
+                                      color: roleTextMap[r] || "var(--primary)",
+                                    }}
+                                  >
+                                    {r}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <button
+                                id={`edit-roles-${u.id}`}
+                                onClick={() => openEditRoles(u.id)}
+                                disabled={isOffline}
+                                className="btn btn-ghost btn-sm"
+                              >
+                                Edit Roles
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "logs" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: "var(--primary)",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    Audit Logs Monitor
+                  </h2>
+                  <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
+                    Security trail of all request modifications and approval decisions.
+                  </p>
+                </div>
+                <div className="search-input-wrap">
+                  <input
+                    type="text"
+                    placeholder="Search logs…"
+                    value={logSearch}
+                    onChange={(e) => setLogSearch(e.target.value)}
+                    id="audit-log-search"
+                    className="field-input"
+                    style={{ paddingLeft: 36, minWidth: 200 }}
+                  />
+                </div>
+              </div>
+
+              <div
+                className="card"
+                style={{ overflow: "hidden", maxHeight: 540 }}
+              >
+                <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 540 }}>
+                  <table className="data-table">
+                    <thead
+                      style={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
+                        background: "var(--surface-raised)",
+                      }}
+                    >
+                      <tr>
+                        <th>Timestamp</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Ticket</th>
+                        <th>Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={5}>
+                            <div className="empty-state">
+                              <p className="empty-state-icon">📋</p>
+                              <p className="empty-state-title">No audit logs</p>
+                              <p className="empty-state-body">
+                                {isOffline
+                                  ? "Audit logs unavailable while offline."
+                                  : "No audit log records found."}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredLogs.map((log) => (
+                          <tr key={log.id}>
+                            <td style={{ color: "var(--muted)", fontSize: 12, whiteSpace: "nowrap" }}>
+                              {new Date(log.createdAt).toLocaleString()}
+                            </td>
+                            <td>
+                              <p style={{ fontWeight: 600, fontSize: 12 }}>
+                                {log.actor.name}
+                              </p>
+                              <p style={{ fontSize: 11, color: "var(--muted)" }}>
+                                {log.actor.email}
+                              </p>
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "var(--primary)",
+                                  background: "var(--primary-light)",
+                                  padding: "2px 8px",
+                                  borderRadius: "var(--radius-sm)",
+                                }}
+                              >
+                                {log.actionType}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 600, color: "var(--primary)", fontSize: 12 }}>
+                              {log.request?.ticketNo || (
+                                <span style={{ color: "var(--muted-light)" }}>—</span>
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                fontSize: 11,
+                                color: "var(--muted)",
+                                maxWidth: 200,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {JSON.stringify(log.details)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Role Edit Drawer */}
+      {drawerOpen && selectedUser && (
+        <div>
+          <div className="drawer-overlay" onClick={closeDrawer} />
+          <form
+            onSubmit={handleUpdateRoles}
+            className="drawer-panel animate-fade-in"
+          >
+            <div className="drawer-header">
+              <div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--muted)",
+                  }}
+                >
+                  Privilege Console
+                </span>
+                <h3
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: "var(--primary)",
+                    marginTop: 2,
+                  }}
+                >
+                  {selectedUser.name}
+                </h3>
+              </div>
+              <button
+                onClick={closeDrawer}
+                type="button"
+                className="drawer-close-btn"
+                id="admin-drawer-close"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="drawer-body">
+              <div id="admin-drawer-alert" className="hidden" style={{ marginBottom: 16 }} />
+
+              {/* User info card */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "14px 16px",
+                  background: "var(--surface-raised)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  marginBottom: 24,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    background: "var(--primary-light)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 16,
+                    fontWeight: 800,
+                    color: "var(--primary)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {selectedUser.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+                    {selectedUser.jobTitle || "No job title"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>
+                    {selectedUser.email}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                    color: "var(--muted)",
+                    marginBottom: 16,
+                  }}
+                >
+                  Permitted System Roles
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {roleCodes.map((code) => {
+                    const hasRole = selectedUser.roles.includes(code);
+                    return (
+                      <label
+                        key={code}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "12px 14px",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-md)",
+                          cursor: "pointer",
+                          background: hasRole ? "var(--primary-light)" : "var(--surface)",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          name="roles"
+                          value={code}
+                          defaultChecked={hasRole}
+                          id={`role-check-${code}`}
+                        />
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--text)",
+                          }}
+                        >
+                          {code}
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 400,
+                              color: "var(--muted)",
+                              marginLeft: 6,
+                            }}
+                          >
+                            mode
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="drawer-footer" style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={closeDrawer}
+                className="btn btn-ghost"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                id="save-roles-btn"
+                disabled={isPending}
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+              >
+                Save Roles
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

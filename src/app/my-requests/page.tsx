@@ -53,22 +53,20 @@ export default async function MyRequestsPage() {
       },
     });
 
-    requests = dbRequests as unknown as React.ComponentProps<typeof MyRequestsClient>["requests"];
+    requests = dbRequests as unknown as React.ComponentProps<
+      typeof MyRequestsClient
+    >["requests"];
   } catch (err) {
     console.error("Database connection failed in MyRequestsPage:", err);
     isOffline = true;
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <section className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          History & Tracking
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
-          My Service Requests
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
+    <main className="page-container page-main">
+      <section style={{ marginBottom: 32 }}>
+        <p className="page-eyebrow">History &amp; Tracking</p>
+        <h1 className="page-title">My Service Requests</h1>
+        <p className="page-subtitle">
           Track details, workflow progression, and status updates of your submissions.
         </p>
       </section>

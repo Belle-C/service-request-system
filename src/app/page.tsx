@@ -20,6 +20,30 @@ interface RequestItem {
   createdAt: string;
 }
 
+// Static enrichment for the 4 known request types
+const typeEnrichment: Record<
+  string,
+  { icon: string; shortPurpose: string; isSap?: boolean }
+> = {
+  DIGITAL_SUPPORT: {
+    icon: "🖥️",
+    shortPurpose: "IT helpdesk, device provisioning, and digital tooling issues.",
+  },
+  APP_ENHANCEMENT: {
+    icon: "⚙️",
+    shortPurpose: "Request new features, integrations, or application improvements.",
+  },
+  OFFBOARDING: {
+    icon: "👤",
+    shortPurpose: "End-to-end employee offboarding and access deprovisioning.",
+  },
+  SAP_S4: {
+    icon: "📊",
+    shortPurpose: "Finance workflow submissions routed through SAP S4 HANA.",
+    isSap: true,
+  },
+};
+
 export default function Home() {
   const { currentUser, selectedRole } = useRole();
   const [requestTypes, setRequestTypes] = useState<RequestType[]>([]);
@@ -28,22 +52,17 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    Promise.resolve().then(() => {
-      setIsLoading(true);
-      setIsOffline(false);
-    });
+    let cancelled = false;
 
-    // Fetch request types
     const fetchTypes = fetch("/api/request-types")
       .then((res) => {
         if (!res.ok) throw new Error("Offline");
         return res.json();
       })
       .then((data) => {
-        setRequestTypes(data.requestTypes || []);
+        if (!cancelled) setRequestTypes(data.requestTypes || []);
       });
 
-    // Fetch user requests if email is simulated
     const fetchRequests = currentUser?.email
       ? fetch(`/api/requests?email=${encodeURIComponent(currentUser.email)}`)
           .then((res) => {
@@ -51,18 +70,22 @@ export default function Home() {
             return res.json();
           })
           .then((data) => {
-            setUserRequests(data.requests || []);
+            if (!cancelled) setUserRequests(data.requests || []);
           })
       : Promise.resolve();
 
     Promise.all([fetchTypes, fetchRequests])
       .catch((err) => {
         console.error("API Error on Landing Page:", err);
-        setIsOffline(true);
+        if (!cancelled) setIsOffline(true);
       })
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser?.email, selectedRole]);
 
   const totalRequests = userRequests.length;
@@ -70,80 +93,185 @@ export default function Home() {
   const approvedRequests = userRequests.filter((r) => r.status === "Approved").length;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="page-container page-main">
       {isOffline && (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-xs">
-          <p className="font-semibold flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500 animate-pulse"></span>
-            Database / API Offline
-          </p>
-          <p className="mt-1 text-xs">
-            The database connection is currently unavailable. Showing mock/offline fallback interface.
-          </p>
+        <div className="offline-banner" style={{ marginBottom: 28 }}>
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>
+              Database / API Offline
+            </p>
+            <p style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>
+              The database connection is currently unavailable. Showing offline fallback interface.
+            </p>
+          </div>
         </div>
       )}
 
-      <section className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Internal Service Requests
-        </p>
-        <h1 className="mt-2 text-4xl font-bold tracking-tight text-[var(--primary)]">
-          Welcome, {currentUser?.name || "User"}
+      {/* Hero / Welcome Section */}
+      <section style={{ marginBottom: 40 }}>
+        <p className="page-eyebrow">Internal Service Portal</p>
+        <h1 className="page-title">
+          Welcome back,{" "}
+          <span style={{ color: "var(--accent)" }}>
+            {currentUser?.name?.split(" ")[0] || "User"}
+          </span>
         </h1>
-        <p className="mt-3 max-w-2xl text-md text-[var(--muted)]">
-          Submit new SAP S4 HANA or IT requests, track ongoing approvals, and manage system configurations.
+        <p className="page-subtitle">
+          Submit new service requests, track ongoing approvals, and manage system
+          configurations — all in one place.
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="My Total Requests" value={isLoading ? "..." : String(totalRequests)} />
-        <SummaryCard label="Pending Approval" value={isLoading ? "..." : String(pendingRequests)} />
-        <SummaryCard label="Approved Requests" value={isLoading ? "..." : String(approvedRequests)} />
+      {/* Metrics Row */}
+      <section className="grid-metrics-3" style={{ marginBottom: 48 }}>
+        <SummaryCard
+          label="My Total Requests"
+          value={isLoading ? "—" : String(totalRequests)}
+          accent="primary"
+        />
+        <SummaryCard
+          label="Pending Approval"
+          value={isLoading ? "—" : String(pendingRequests)}
+          accent="blue"
+        />
+        <SummaryCard
+          label="Approved"
+          value={isLoading ? "—" : String(approvedRequests)}
+          accent="green"
+        />
       </section>
 
-      <section className="mt-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xs">
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      {/* Request Type Cards */}
+      <section>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            marginBottom: 20,
+            gap: 16,
+          }}
+        >
           <div>
-            <h2 className="text-lg font-semibold text-[var(--primary)]">Submit a New Service Request</h2>
-            <p className="text-sm text-[var(--muted)]">Select a category below to initiate a request</p>
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "var(--primary)",
+                letterSpacing: "-0.015em",
+              }}
+            >
+              Submit a New Request
+            </h2>
+            <p
+              style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}
+            >
+              Choose a category to start your request workflow.
+            </p>
           </div>
-          <span className="rounded-full bg-[var(--surface-muted)] border border-[var(--border)] px-2.5 py-1 text-xs font-medium text-[var(--primary)]">
-            Active Mode: {selectedRole}
+          <span
+            style={{
+              padding: "5px 12px",
+              borderRadius: "var(--radius-full)",
+              background: "var(--primary-light)",
+              color: "var(--primary)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {selectedRole} mode
           </span>
         </div>
 
         {isLoading ? (
-          <div className="py-8 text-center text-sm text-[var(--muted)]">Loading request types...</div>
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            }}
+          >
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="card"
+                style={{
+                  padding: 24,
+                  height: 160,
+                  background:
+                    "linear-gradient(90deg, #f1f5f7 25%, #e8edf0 50%, #f1f5f7 75%)",
+                  backgroundSize: "200% 100%",
+                  animation: "pulse 1.5s infinite",
+                }}
+              />
+            ))}
+          </div>
         ) : requestTypes.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--muted)]">
-            No request types loaded. Please verify your backend configuration.
+          <div className="card empty-state">
+            <p className="empty-state-icon">📋</p>
+            <p className="empty-state-title">No Request Types Configured</p>
+            <p className="empty-state-body">
+              Please verify your backend configuration to see available request categories.
+            </p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            {requestTypes.map((type) => (
-              <Link
-                key={type.code}
-                href={`/new-request?type=${type.code}`}
-                className="group relative flex flex-col justify-between rounded-lg border border-[var(--border)] bg-white p-5 transition-all hover:border-[var(--primary)] hover:shadow-sm"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-[var(--primary)] group-hover:underline">
-                      {type.label}
-                    </h3>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-sm bg-[var(--surface-muted)] text-[var(--primary)]">
-                      {type.moduleCode}
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            }}
+          >
+            {requestTypes.map((type) => {
+              const enrich = typeEnrichment[type.code] || {
+                icon: "📝",
+                shortPurpose: type.purpose,
+              };
+              const isSap = enrich.isSap;
+
+              return (
+                <Link
+                  key={type.code}
+                  href={`/new-request?type=${type.code}`}
+                  className={`request-type-card ${isSap ? "is-sap" : ""}`}
+                  id={`request-type-card-${type.code.toLowerCase()}`}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 28,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {enrich.icon}
                     </span>
+                    <span className="rtc-module-tag">{type.moduleCode}</span>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
-                    {type.purpose}
+
+                  <div>
+                    <p className="rtc-title">{type.label}</p>
+                    <p className="rtc-purpose" style={{ marginTop: 6 }}>
+                      {enrich.shortPurpose || type.purpose}
+                    </p>
+                  </div>
+
+                  <p className="rtc-cta">
+                    Start request <span>→</span>
                   </p>
-                </div>
-                <div className="mt-4 flex items-center text-xs font-semibold text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity">
-                  Start Request &rarr;
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

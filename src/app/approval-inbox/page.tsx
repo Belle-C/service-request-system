@@ -59,23 +59,22 @@ export default async function ApprovalInboxPage() {
       },
     });
 
-    approvals = dbApprovals as unknown as React.ComponentProps<typeof ApprovalInboxClient>["approvals"];
+    approvals = dbApprovals as unknown as React.ComponentProps<
+      typeof ApprovalInboxClient
+    >["approvals"];
   } catch (err) {
     console.error("Database connection failed in ApprovalInboxPage:", err);
     isOffline = true;
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <section className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Actions Required
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
-          Approval Inbox
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Evaluate, approve, reject, or return incoming finance and service requests.
+    <main className="page-container page-main">
+      <section style={{ marginBottom: 32 }}>
+        <p className="page-eyebrow">Actions Required</p>
+        <h1 className="page-title">Approval Inbox</h1>
+        <p className="page-subtitle">
+          Evaluate, approve, reject, or return incoming finance and service requests
+          assigned to you.
         </p>
       </section>
 

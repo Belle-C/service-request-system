@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function NewRequestPage() {
   let configs: { id: string; subcategory: string; isActive: boolean }[] = [];
-  let settings: { descriptionRequired: boolean; attachmentRequired: boolean } | null = null;
+  let settings: { descriptionRequired: boolean; attachmentRequired: boolean } | null =
+    null;
   let isOffline = false;
 
   try {
@@ -33,14 +34,13 @@ export default async function NewRequestPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
-      <section className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Create Request
+    <main className="page-container page-main">
+      <section style={{ marginBottom: 36 }}>
+        <p className="page-eyebrow">Create Request</p>
+        <h1 className="page-title">New Service Request</h1>
+        <p className="page-subtitle">
+          Select a request type and complete the form to initiate a new workflow.
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
-          New Service Request
-        </h1>
       </section>
 
       <NewRequestForm configs={configs} settings={settings} isOffline={isOffline} />

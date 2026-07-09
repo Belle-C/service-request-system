@@ -68,15 +68,11 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <section className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          System Administration
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">
-          Admin Workspace
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
+    <main className="page-container page-main">
+      <section style={{ marginBottom: 36 }}>
+        <p className="page-eyebrow">System Administration</p>
+        <h1 className="page-title">Admin Workspace</h1>
+        <p className="page-subtitle">
           Manage user authorization roles and monitor audit log security records.
         </p>
       </section>
